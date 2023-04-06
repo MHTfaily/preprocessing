@@ -181,13 +181,7 @@ def remove_short_long_words_11(tweet, min_length=2, max_length=20):
     filtered_tweet = ' '.join(filtered_words)  # Join the filtered words back to form the tweet
     return filtered_tweet
 
-def correct_misspelled_words_12(tweet, word_frequency, misspell_indicator=1):
-    
-    
-    lemmatizer = WordNetLemmatizer()
-    new_tweet = []
-    tags = nltk.pos_tag(tweet.split(" "), tagset = "universal")
-    
+def correct_misspelled_words_12(tweet, word_frequency, misspell_indicator=1):    
     
     def get_misspelled_words(tweet):
         # Tokenize the tweet into words
