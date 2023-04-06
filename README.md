@@ -1,6 +1,6 @@
 # preprocessing
 ### Initialisation: 
-#####PreProcessing.PreProcessingTweets(data: a dataframe with a column called "text")
+##### PreProcessing.PreProcessingTweets(data: a dataframe with a column called "text")
 ### methods: 
 ##### PreProcessing.clean()
 cleans the data
