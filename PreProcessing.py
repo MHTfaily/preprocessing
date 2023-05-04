@@ -4,7 +4,6 @@ import contractions
 import enchant
 from collections import defaultdict
 import nltk
-from nltk.metrics.distance import jaccard_distance
 from nltk.util import ngrams
 from nltk.corpus import words,stopwords
 from nltk import word_tokenize
