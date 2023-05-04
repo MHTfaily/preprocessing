@@ -10,6 +10,7 @@ from nltk.corpus import words,stopwords
 from nltk import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import emoji
+import textblob
 import pandas as pd
 
 
@@ -192,13 +193,22 @@ def correct_misspelled_words_12(tweet, word_frequency, misspell_indicator=1):
         misspelled_words = [word for word in words if word.lower() not in english_words]
         return misspelled_words
 
+    # Import TextBlob
+    from textblob import TextBlob
+
+    # Create a TextBlob object with the misspelled word
+    txt = TextBlob("I loev my ieda.")
+
+    # Use the correct() method to correct the spelling
+    txt = txt.correct()
+
+    # Print the corrected word
+    print(txt)
+    
     new_words = []
     for word in get_misspelled_words(tweet):
         if word_frequency[word] <= misspell_indicator:
-            temp = [(jaccard_distance(set(ngrams(word, 2)),
-                              set(ngrams(w, 2))),w)
-            for w in all_words if w[0]==word[0]]
-            new_words.append((word,sorted(temp, key = lambda val:val[0])[0][1]))
+            new_words.append((word,TextBlob(word).correct()))
     for i in new_words:
         tweet = tweet.replace(i[0],i[1])
     return tweet.lower()
@@ -243,7 +253,7 @@ class PreProcessingTweets:
         self.url = []
         self.mention = []
         self.tag = []        
-        self.data['text'] = self.data['text'].apply(expand_social_media_abbreviations_1, abbreviations=social_media_abbreviations).apply(remove_url_mention_tag_tweet).apply(remove_rt_tag_3).apply(Replace_contractions_with_their_expanded_forms_4).apply(translate_emoji_5).apply(remove_non_ascii_6).apply(remove_digits_7).apply(remove_non_letters_8).apply(lowercase_9).apply(correct_elongated_words_10).apply(lowercase_9).apply(remove_short_long_words_11)
+        self.data['text'] = self.data['text'].apply(expand_social_media_abbreviations_1, abbreviations=social_media_abbreviations).apply(remove_url_mention_tag_tweet).apply(remove_rt_tag_3).apply(Replace_contractions_with_their_expanded_forms_4).apply(translate_emoji_5).apply(remove_non_ascii_6).apply(remove_digits_7).apply(remove_non_letters_8).apply(lowercase_9).apply(correct_elongated_words_10).apply(remove_short_long_words_11)
         self.word_frequency = get_word_frequency(data)
         
     def clean(self):
