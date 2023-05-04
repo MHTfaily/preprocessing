@@ -9,7 +9,7 @@ from nltk.corpus import words,stopwords
 from nltk import word_tokenize
 from nltk.stem import WordNetLemmatizer
 import emoji
-import textblob
+from textblob import TextBlob
 import pandas as pd
 
 
@@ -191,23 +191,11 @@ def correct_misspelled_words_12(tweet, word_frequency, misspell_indicator=1):
         # Identify misspelled words
         misspelled_words = [word for word in words if word.lower() not in english_words]
         return misspelled_words
-
-    # Import TextBlob
-    from textblob import TextBlob
-
-    # Create a TextBlob object with the misspelled word
-    txt = TextBlob("I loev my ieda.")
-
-    # Use the correct() method to correct the spelling
-    txt = txt.correct()
-
-    # Print the corrected word
-    print(txt)
     
     new_words = []
     for word in get_misspelled_words(tweet):
         if word_frequency[word] <= misspell_indicator:
-            new_words.append((word,TextBlob(word).correct()))
+            new_words.append((word,str(TextBlob(word).correct())))
     for i in new_words:
         tweet = tweet.replace(i[0],i[1])
     return tweet.lower()
