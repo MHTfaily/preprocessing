@@ -244,7 +244,7 @@ class PreProcessingTweets:
         self.word_frequency = get_word_frequency(data)
         
     def clean(self):
-        self.data = self.data['text'].apply(correct_misspelled_words_12, word_frequency = self.word_frequency, misspell_indicator=1).apply(remove_stopwords_13).apply(Tweet_lemmatizer_14)
+        self.data = self.data['text'].apply(correct_misspelled_words_12, word_frequency = self.word_frequency, misspell_indicator=1).apply(remove_short_long_words_11).apply(remove_stopwords_13).apply(Tweet_lemmatizer_14)
 
     def get_data(self):
         return self.data
