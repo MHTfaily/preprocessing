@@ -11,7 +11,13 @@ from nltk.stem import WordNetLemmatizer
 import emoji
 from textblob import TextBlob
 import pandas as pd
+import time
+import numpy as np
+import multiprocessing
+import html
 
+def remove_html_entities(text):
+    return html.unescape(text)
 
 def get_word_frequency(dataframe):
     word_frequency = defaultdict(int)
@@ -25,6 +31,8 @@ def get_word_frequency(dataframe):
 
 
 all_words = set(nltk.corpus.words.words()) #Used as engish words
+stop_words = set(stopwords.words('english'))  # Get the set of English stop words
+
 
 social_media_abbreviations = {
     "lol": "laughing out loud",
@@ -91,38 +99,31 @@ def remove_url_mention_tag_tweet(tweet):
 
 #used in cleaning the tweets
 def expand_social_media_abbreviations_1(tweet, abbreviations):
-    words = tweet.split()  # Split the tweet into words
-    expanded_tweet = []  # List to store expanded words
-    for word in words:
-        if word in abbreviations:
-            # If the word is an abbreviation, replace it with its full form
-            expanded_tweet.append(abbreviations[word])
-        else:
-            # If not an abbreviation, keep the original word
-            expanded_tweet.append(word)
-    # Join the words back to form the expanded tweet
-    expanded_tweet = ' '.join(expanded_tweet)
-    return expanded_tweet
+    tweet = remove_html_entities(tweet)
+    return ' '.join([abbreviations.get(word, word) for word in tweet.split()])
 
+
+url_regex = re.compile("(?P<url>https?://[^\s]+)")
+mention_regex = re.compile("(?<!\w)@\w+")
+hashtag_regex = re.compile("(?<!\w)#[\w]+")
+pattern_regex = re.compile("|".join([url_regex.pattern, mention_regex.pattern, hashtag_regex.pattern]))
 def extract_url_mention_tag_tweet_2(tweet):
-    # Extract URLs using regular expression
-    urls = re.findall("(?P<url>https?://[^\s]+)", tweet)
-
-    # Extract mentions using regular expression
-    mentions = re.findall("(?<!\w)@\w+", tweet)
-
-    # Extract hashtags using regular expression
-    hashtags = re.findall("(?<!\w)#[\w]+", tweet)
+    # Extract URLs, mentions, and hashtags using regular expression
+    matches = pattern_regex.findall(tweet)
+    urls = [m[0] for m in matches if m[1] == url_regex]
+    mentions = [m[0] for m in matches if m[1] == mention_regex]
+    hashtags = [m[0] for m in matches if m[1] == hashtag_regex]
 
     # Remove URLs, mentions, and hashtags from tweet
-    tweet = re.sub("(?P<url>https?://[^\s]+)", "", tweet)
-    tweet = re.sub("(?<!\w)@\w+", "", tweet)
-    tweet = re.sub("(?<!\w)#[\w]+", "", tweet)
+    tweet = pattern_regex.sub("", tweet)
 
     return tweet, urls, mentions, hashtags
 
+
+rt_regex = re.compile(r'\bRT\b')
 def remove_rt_tag_3(tweet):
-    return re.sub(r'\bRT\b', '', tweet).strip()
+    return rt_regex.sub('', tweet).strip()
+
 
 def Replace_contractions_with_their_expanded_forms_4(tweet):  #"ain't" => "am not",...
     return contractions.fix(tweet) #used library contractions
@@ -135,8 +136,9 @@ def remove_non_ascii_6(tweet): #Héllø Wørld! => Hll Wrld!
     decoded_text = encoded_text.decode("utf-8")
     return decoded_text
 
-def remove_digits_7(tweet): 
-    clean_text = re.sub(r'\d+', '', tweet)
+digit_regex = re.compile(r'\d+')
+def remove_digits_7(tweet):
+    clean_text = digit_regex.sub('', tweet)
     return clean_text
 
 def remove_non_letters_8(tweet):
@@ -173,13 +175,9 @@ def correct_elongated_words_10(tweet): #This is soooo cooooool! GOOOD => This is
     return corrected_tweet[:-1]
 
 def remove_short_long_words_11(tweet, min_length=2, max_length=20):
-    words = tweet.split()  
-    filtered_words = []
-    for word in words:
-        if len(word) >= min_length and len(word) <= max_length:
-            filtered_words.append(word)
-    filtered_tweet = ' '.join(filtered_words)  # Join the filtered words back to form the tweet
-    return filtered_tweet
+    words = tweet.split()
+    filtered_words = [word for word in words if len(word) >= min_length and len(word) <= max_length]
+    return ' '.join(filtered_words)
 
 def correct_misspelled_words_12(tweet, word_frequency, misspell_indicator=1):    
     
@@ -201,7 +199,6 @@ def correct_misspelled_words_12(tweet, word_frequency, misspell_indicator=1):
     return tweet.lower()
 
 def remove_stopwords_13(tweet):
-    stop_words = set(stopwords.words('english'))  # Get the set of English stop words
     words = tweet.split()  # Split the tweet into words
     filtered_words = [word for word in words if word.lower() not in stop_words]  # Filter out stop words
     filtered_tweet = ' '.join(filtered_words)  # Join the filtered words back to form the tweet
@@ -234,17 +231,141 @@ def Tweet_lemmatizer_14(tweet):
     return new_tweet
 
 
+# Define a function to preprocess a chunk of rows of the DataFrame
+def preprocess_chunk(chunk):
+    # Measure the start time
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(expand_social_media_abbreviations_1, abbreviations=social_media_abbreviations)
+    # Measure the end time and print the difference
+    end = time.time()
+    print(f"Time taken for expand_social_media_abbreviations_1: {end - start} seconds")
+
+    # Repeat the same process for other functions
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(remove_url_mention_tag_tweet)
+    end = time.time()
+    print(f"Time taken for remove_url_mention_tag_tweet: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(remove_rt_tag_3)
+    end = time.time()
+    print(f"Time taken for remove_rt_tag_3: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(Replace_contractions_with_their_expanded_forms_4)
+    end = time.time()
+    print(f"Time taken for Replace_contractions_with_their_expanded_forms_4: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(translate_emoji_5)
+    end = time.time()
+    print(f"Time taken for translate_emoji_5: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(remove_non_ascii_6)
+    end = time.time()
+    print(f"Time taken for remove_non_ascii_6: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(remove_digits_7)
+    end = time.time()
+    print(f"Time taken for remove_digits_7: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(remove_non_letters_8)
+    end = time.time()
+    print(f"Time taken for remove_non_letters_8: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(lowercase_9)
+    end = time.time()
+    print(f"Time taken for lowercase_9: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(correct_elongated_words_10)
+    end = time.time()
+    print(f"Time taken for correct_elongated_words_10: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(remove_short_long_words_11)
+    end = time.time()
+    print(f"Time taken for remove_short_long_words_11: {end - start} seconds")
+
+    return chunk
+
+    
+def preprocess_chunk2(chunk, wordfrequency):
+    # Measure the start time
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(correct_misspelled_words_12, word_frequency=wordfrequency, misspell_indicator=1)
+    # Measure the end time and print the difference
+    end = time.time()
+    print(f"Time taken for correct_misspelled_words_12: {end - start} seconds")
+
+    # Repeat the same process for other functions
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(remove_short_long_words_11)
+    end = time.time()
+    print(f"Time taken for remove_short_long_words_11: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(remove_stopwords_13)
+    end = time.time()
+    print(f"Time taken for remove_stopwords_13: {end - start} seconds")
+
+    start = time.time()
+    chunk['text'] = chunk['text'].apply(Tweet_lemmatizer_14)
+    end = time.time()
+    print(f"Time taken for Tweet_lemmatizer_14: {end - start} seconds")
+
+    return chunk
+
+
 class PreProcessingTweets:
     def __init__(self,data):
+        start_time = time.time()
         self.data = data
         self.url = []
         self.mention = []
         self.tag = []        
-        self.data['text'] = self.data['text'].apply(expand_social_media_abbreviations_1, abbreviations=social_media_abbreviations).apply(remove_url_mention_tag_tweet).apply(remove_rt_tag_3).apply(Replace_contractions_with_their_expanded_forms_4).apply(translate_emoji_5).apply(remove_non_ascii_6).apply(remove_digits_7).apply(remove_non_letters_8).apply(lowercase_9).apply(correct_elongated_words_10).apply(remove_short_long_words_11)
+
+        # Define the number of workers to use
+        num_workers = multiprocessing.cpu_count()
+        # Split the DataFrame into chunks and preprocess each chunk in parallel using multiprocessing
+        chunks = np.array_split(self.data, num_workers)
+        with multiprocessing.Pool(processes=num_workers) as pool:
+            chunks = pool.map(preprocess_chunk, chunks)
+        # Concatenate the preprocessed chunks back into a single DataFrame
+        preprocessed_data = pd.concat(chunks)
+        # Update the 'text' column of the original DataFrame with the preprocessed texts
+        self.data['text'] = preprocessed_data['text']
+
         self.word_frequency = get_word_frequency(data)
+        print(f"Time taken for PreProcessingTweets.__init__: {time.time() - start_time} seconds")
         
+    # def clean(self):
+        # self.data = self.data['text'].apply(correct_misspelled_words_12, word_frequency = self.word_frequency, misspell_indicator=1).apply(remove_short_long_words_11).apply(remove_stopwords_13).apply(Tweet_lemmatizer_14)
+
     def clean(self):
-        self.data = self.data['text'].apply(correct_misspelled_words_12, word_frequency = self.word_frequency, misspell_indicator=1).apply(remove_short_long_words_11).apply(remove_stopwords_13).apply(Tweet_lemmatizer_14)
+        start_time = time.time()
+
+        # Define the number of workers to use
+        num_workers = multiprocessing.cpu_count()
+
+        # Split the DataFrame into chunks and preprocess each chunk in parallel using multiprocessing
+        chunks = np.array_split(self.data, num_workers)
+        with multiprocessing.Pool(processes=num_workers) as pool:
+            # Use starmap_async with tuples of arguments
+            chunks = pool.starmap_async(preprocess_chunk2, [(chunk, self.word_frequency) for chunk in chunks])
+            chunks = chunks.get()
+
+        # Concatenate the preprocessed chunks back into a single DataFrame
+        preprocessed_data = pd.concat(chunks)
+
+        # Update the 'text' column of the original DataFrame with the preprocessed texts
+        self.data['text'] = preprocessed_data['text']
+        print(f"Time taken for cleaning: {time.time() - start_time} seconds")
+
 
     def get_data(self):
         return self.data
